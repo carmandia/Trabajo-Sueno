@@ -1,0 +1,23 @@
+---
+title: "Estudio de enfermedades del sueño"
+output: 
+  flexdashboard::flex_dashboard
+runtime: shiny
+---
+```{r setup,include=FALSE}
+library(flexdashboard)
+library(shinydashboard)
+```
+
+```{r,warning=FALSE,include=FALSE}
+library(reticulate)
+```
+
+
+```{python}
+import matplotlib
+print(matplotlib.matplotlib_fname())
+#matplotlib.rcParams['figure.figsize']=[6.0,3.75]
+#import matplotlib.pyplot as plt
+#import seaborn as sns
+```

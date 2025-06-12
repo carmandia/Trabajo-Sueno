@@ -1,0 +1,646 @@
+---
+title: "Trabajo: Estudio de enfermedades del sueño"
+author: "Carlos Manzano Diaz"
+date: "2025-04-15"
+output: 
+  flexdashboard::flex_dashboard:
+    orientation: columns
+    vertical_layout: scroll
+    css: estilo.css
+runtime: shiny
+---
+
+```{r setup,include=FALSE}
+library(flexdashboard)
+```
+
+```{r,warning=FALSE}
+library(tidyverse)
+library(dplyr)
+library(readr)
+library(magrittr)
+library(tidymodels)
+library(themis)
+library(reticulate)
+```
+
+```{r}
+datos <- read_csv("sleep_health_lifestyle_dataset.csv")
+#View(datos)
+```
+
+# Introducción
+
+<h1>Introducción y lectura de datos</h1>
+
+El trabajo se basa en un fichero **csv** extraido del sitio web *KAGGLE* llamado **"sleep_health_lifestyle_dataset.csv"**. Este fichero contiene una serie de columnas que las usaremos para intentar predecir enfermedades o la no tenencia de una sobre el sueño. Esa variable se encuentra en la última columna.
+
+A continuación pasaremos a una visualizacion del DataFrame para hacernos un poco la idea  las distintas variables que tiene, que trabajo tendremos que acometer a lo largo del proyecto en cuestion de depuración de datos si hiciera falta, que representaciones gráficas pudieran resultar de interés.
+
+```{r}
+datos
+```
+
+Como podemos ver de un primer vistazo, nos encontramos con la primera columna que es un id, y por lo tanto podemos prescindir de el tanto para la visualizacion como para lo modelos. Posteriormente nos encontramos variables como genero y edad cuyo estudio puede ser interesante si mujeres u hombres sufren mas o menos enfermedades del sueño, o si estas se ven afectadas por la franja de edad donde se encuentre la persona. Luego una variable sobre el trabajo que desarrolla la persona que también resulta interesante para los mismos estudios que antes. Tras esto tenemos variables mas relacionadas con el sueño como el numero de horas que duerme la persona o la calidad del sueño que seguro serán muy importantes para la fase de los modelos. Continuando, nos encontramos con una variable, la presión sanguínea que vemos que en una misma variable agrupa dos informaciones, la presión baja y alta separadas por una barra, por lo que como depuración tendremos que separar esta variable en otras dos.
+
+```{r}
+summary(datos)
+```
+
+De esta manera vemos el tipo de datos que tiene cada variable por si es necesario cambiarlo, junto con algunos datos interesantes de las variables.
+
+# Depuración de datos
+
+Continuamos con la adecuación de los datos que nos proporciona el DataFrame para poder representarlo gráficamente y construir modelos adecuadamente.
+
+Nuestro primer paso, como comentamos nada mas visualizar los datos es eliminar la primera variable:
+
+```{r, echo=TRUE}
+datos %<>%
+  select(-`Person ID`)
+```
+
+A continuación pasamos a cambiar de tipo algunas variables que vienen como variables de tipo carácter a factor o tipo numérico.
+
+<div class="flex2>
+<div>
+1. Variable *Gender*
+```{r}
+datos$Gender <- datos %$%
+  Gender %>%
+  as.factor()
+```
+</div>
+<div>
+2. Variable *BMI Category*
+
+```{r}
+datos$`BMI Category` <- datos %$%
+  `BMI Category` %>%
+  as.factor()
+```
+</div>
+<div>
+3. Variable *Occupation*
+
+```{r}
+datos$Occupation <- datos %$%
+  Occupation %>%
+  as.factor()
+```
+</div>
+<div>
+4. Variable *Sleep Disorder*
+
+```{r}
+datos$`Sleep Disorder` <- datos %$%
+  `Sleep Disorder` %>%
+  as.factor()
+```
+</div>
+</div>
+
+<div class="col2">
+A continuación pasamos a cambiar la variable Blood Pressure. Como hemos comentado al comienzo, esta variable contiene la presión alta y baja en una sola y separada por la barra "/". Lo que haremos es dividir esta variable en otras dos que ya renombraremos separando por esa barra.
+
+  <div>
+```{r}
+datos %$%
+  `Blood Pressure (systolic/diastolic)` %>%
+  str_split(.,pattern="/",simplify = T) 
+```
+  
+  </div>
+
+Así tenemos dividida la variable ya en dos columnas, una con la presión alta (la primera) y la otra con la presión baja. Pasamos a guardar cada una como variables y a eliminar esa variable que no nos sirve.
+
+  <div>
+```{r}
+Press_High <- datos %$%
+  `Blood Pressure (systolic/diastolic)` %>%
+  str_split(.,pattern="/",simplify = T) %>%
+  .[,1] %>%
+  as.numeric()
+Press_Low <- datos %$%
+  `Blood Pressure (systolic/diastolic)` %>%
+  str_split(.,pattern="/",simplify = T) %>%
+  .[,2] %>%
+  as.numeric()
+datos$Press_High <- Press_High
+datos$Press_Low <- Press_Low
+```
+
+Ahora solo nos queda eliminar la columna que hemos transformado.
+
+```{r}
+datos %<>%
+  select(-`Blood Pressure (systolic/diastolic)`)
+```
+
+De esta manera Ya tenemos todas las variables de manera adecuada para la representación gráfica de estudios que nos interesen para una posterior construcción de modelos.
+
+Antes de terminar exportamos en un fichero nuevo los datos depurados para posibles consultas. Recordamos que para exportarlos, los datos que estan convertidos a factor debemos pasarlos a tipo *character*:
+
+```{r}
+datos2 <- datos %>%
+  mutate(across(where(is.factor),as.character))
+datos2[datos2$`Sleep Disorder`=="None","Sleep Disorder"]="No enfermedad"
+write_csv(x = datos2,file = "Datos_depurados.csv",col_names = T)
+```
+
+  </div>
+</div>
+
+# Visualizacion de datos
+
+## Presion Arterial (Alta y baja)
+<h4>Influencia de la presión arterial</h4>
+
+<div class="col2 sep">
+<div>
+
+```{r}
+datos %>%
+  ggplot(aes(Press_High,Press_Low,color=`Sleep Disorder`)) +
+  geom_point()
+```
+En esta primera gráfica comparamos la presión alta y la presión baja en función del tipo de enfermedad del sueño que tenga la persona. Una vez hecha la representación no podemos inferir gran cosa a partir del gráfico, puesto que todas las enfermedades están mas o menos igualmente representadas para valores similares de presión arterial
+
+</div>
+
+<div>    
+```{r}
+datos %>%
+  ggplot(aes(Press_High,Press_Low,color=`Sleep Disorder`)) +
+  geom_point() +
+  geom_smooth(aes(linetype = `Sleep Disorder`))
+```
+Como podemos observar las linea que interpola cada conjunto de puntos en función de la clase de enfermedad del sueño que tenga es muy similar. Y hay que recalcar que los intervalos de confianza se cortan por lo que podemos descartar que estas variables nos sirvan para identificar que tipo de enfermedad posee la persona
+</div>
+</div>
+
+## Pulsaciones por minuto
+
+<h4>Influencia de las pulsaciones </h4>
+
+<div>
+
+```{r}
+datos %>%
+  ggplot() +
+  stat_summary(aes(`Sleep Disorder`,`Heart Rate (bpm)`),
+               fun=median,
+               fun.min = min,
+               fun.max = max)
+```
+Al igual que en el caso anterior parece que vuelven a ser muy similares las pulsaciones independientemente de la enfermedad que presente el individuo. Lo único que podríamos destacar es que los individuos con apnea del sueño la tienen algo mas alta
+
+</div>
+
+
+## Índice de masa corporal
+<h4>Influencia de la presión arterial</h4>
+
+<div class="col2 sep">
+<div>
+
+```{r}
+datos %>%
+  ggplot() +
+  geom_bar(aes(x=`Sleep Disorder`,fill=`BMI Category`))
+```
+En esta gráfica si que parece que podemos sacar alguna que otra conclusión mas: en el caso de las personas que sufren insomnio, hay una mayor proporción de personas que están demasiado delgados; en el caso de las personas que no sufren ninguna enfermedad parece que hay mayor proporción e personas que sufren sobrepeso. Por otro lado de las personas que sufren apnea del sueño parece que tienen igual proporción.
+
+</div>
+
+<div>    
+```{r}
+datos %>%
+  ggplot() +
+  geom_bar(aes(x=`Sleep Disorder`,fill=`BMI Category`),position = "dodge")
+```
+Con esta gráfica podemos ver mas claro el diagrama anterior. Se hace notar mas que las personas con un indice de masa normal estan representadas en menor proporcion en el conjunto de personas sin efermedad del sueño
+</div>
+</div>
+
+
+## Ocupación laboral e indice de masa corporal
+
+```{r}
+datos %>%
+  count(Occupation,`Stress Level (scale: 1-10)`,`Sleep Disorder`) %>%
+  group_by(Occupation,`Sleep Disorder`) %>%
+  mutate(Proportion = n/sum(n)) %>%
+  ggplot(aes(`Stress Level (scale: 1-10)`,Proportion,fill=`Sleep Disorder`))+
+  geom_col(position = 'dodge') + 
+  scale_y_continuous(labels = scales::percent_format()) +
+  facet_wrap(~Occupation,nrow = 2)
+```
+En este gráfico comparamos por la ocupación que tienen las personas y su enfermedad (o ausencia de ella) el nivel de estrés que dicen tener por si esto pudiera tener un comportamiento específico. Por ejemplo, para las personas que trabajan en labores manuales, los que sufren apnea del sueño son los que en mayor proporción tienen altos niveles de estrés. Lo mismo ocurre para el caso de los estudiantes, que en gran proporción los que dicen sufrir niveles altos de estrés sufren apnea del sueño. En cambio, las personas que sufren insomnio, en cualquier ocupación laboral, parece que se encuentran en mayor porcentaje en niveles de estrés bajos, mientras que las personas que no sufren ninguna enfermedad del sueño parecen estar repartidos los porcentajes entre los distintos niveles de estrés para cualquier ocupación
+
+## Actividad física y duración del sueño
+
+```{r}
+datos %>%
+  ggplot(aes(`Sleep Duration (hours)`,`Quality of Sleep (scale: 1-10)`,color=`Sleep Disorder`)) +
+  geom_point()
+```
+Volvemos a encontrarnos una situación en la que no podemos sacar demasiadas conclusiones puesto que no se observa un patrón en los datos. Lo mas reseñable es que la mayoría de puntos de personas con apnea del sueño tienen una calidad del sueño intermedio, ni valores muy altos ni muy bajos. Vamos a realizar una curva de regresión con su intervalo de confianza para asegurarnos de este patrón
+
+
+```{r}
+datos %>%
+  ggplot(aes(`Sleep Duration (hours)`,`Quality of Sleep (scale: 1-10)`,color=`Sleep Disorder`)) +
+  geom_point() +
+  geom_smooth(aes(linetype = `Sleep Disorder`))
+```
+Vemos que parece que estábamos en lo cierto que no podemos sacar conclusiones puesto que los tres intervalos de confianza se cortan y por tanto no podemos inferir que con una calidad del sueño mejor o pero o mas o menos horas de sueño pueda referirse a una persona con una determinada enfermedad del sueño.
+
+
+# Analisis de los datos y modelado
+A partir de ahora pasamos a trabajar con Python. Comenzamos con la lectura de datos del fichero depurado:
+
+```{python}
+import numpy as np
+import pandas as pd
+from sklearn import preprocessing
+from sklearn import model_selection
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import OneHotEncoder
+from sklearn.pipeline import Pipeline
+from sklearn.compose import ColumnTransformer
+from sklearn.naive_bayes import GaussianNB
+from sklearn.metrics import classification_report,ConfusionMatrixDisplay
+from sklearn.decomposition import PCA
+from sklearn.model_selection import GridSearchCV
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.metrics import accuracy_score
+from sklearn import neighbors
+from sklearn.neural_network import MLPClassifier
+```
+
+
+Y vemos una breve descripción de los datos para ver que no ha habido ningún problema:
+
+```{python}
+datos2 = pd.read_csv('Datos_depurados.csv')
+datos2.info()
+```
+
+Dividimos entre nuestra variable objetivo y las que usamos de predictoras:
+
+```{python}
+predictoras = datos2.loc[:,datos2.columns != 'Sleep Disorder']
+objetivo = datos2['Sleep Disorder']
+predictoras.info()
+objetivo.info()
+```
+
+## Particion en entrenamiento y test
+
+Particionamos los datos en entrenamiento y test para la construcción de los modelos.
+
+En las anteriores secciones nos hemos dado cuenta que hay muchos mas pacientes sin enfermedad que con apnea o insomnio. Veamos en términos porcentuales:
+
+```{python}
+print(pd.Series(objetivo).value_counts(normalize=True))
+```
+Como no tenemos la misma proporción en unas clases que en otras tenemos que separarlos intentando mantener las proporciones.
+
+```{python}
+(predictoras_train,predictoras_test,objetivo_train,objetivo_test) = model_selection.train_test_split(predictoras,objetivo,random_state=47563, test_size=.25,stratify=objetivo)
+```
+
+Dividimos las variables predictoras en las que son numéricas y las que son categóricas:
+
+```{python}
+predictoras_train_num = predictoras_train.select_dtypes(include=['int64', 'float64'])
+predictoras_train_cat = predictoras_train.select_dtypes(include='object')
+predictoras_train_cat.info()
+predictoras_train_num.info()
+```
+Ahora construimos nuestro *pipeline* para transformar los datos. Como en el apartado de visualización no hemos visto que haya ninguna variable que podamos decir que separa a nuestra variable objetivo hacemos un análisis en componentes prinicpales, para ver si reduciendo la dimensionalidad de los datos lo obtenemos de una mejor manera:
+
+```{python}
+preprocesador = ColumnTransformer([('num', StandardScaler(), predictoras_train_num.columns.to_list()),('cat', OneHotEncoder(), predictoras_train_cat.columns.to_list()),])
+
+pipeline = Pipeline([('preprocesado',preprocesador),('pca', PCA(n_components=2)),])
+
+# Aplicar el pipeline
+Conjunto_entrenamiento = pipeline.fit_transform(predictoras_train)
+Conjunto_test = pipeline.transform(predictoras_test)
+#print(Conjunto_entrenamiento)
+#print(Conjunto_test)
+```
+
+Ya tenemos los conjuntos de entrenamiento y test listos para crear los modelos y ver el rendimiento de los mismos
+
+## Construcción de los modelos
+
+### Naive Bayes
+
+```{python}
+clasif_NB = GaussianNB()
+clasif_NB.fit(Conjunto_entrenamiento,objetivo_train)
+```
+Una vez construimos el modelo pasamos a ver su efectividad comparando el resultado de pasar el conjunto test por el modelo con el verdadero valor de la variable objetivo:
+
+```{python}
+objetivo_predicho_NB = clasif_NB.predict(Conjunto_test)
+print(classification_report(objetivo_test,objetivo_predicho_NB,target_names=np.unique(objetivo_test)))
+
+```
+Podemos ver que el rendimiento de nuestro modelo es en general malo, pues no detecta de manera correcta la apnea del sueño. Veamos representada la matriz de confusión:
+
+```{python}
+ConfusionMatrixDisplay.from_estimator(clasif_NB,Conjunto_test,objetivo_test,display_labels=np.unique(objetivo_test),cmap="Blues")
+plt.title("Matriz de Confusión: Método NB")
+plt.show()
+```
+
+Como sospechábamos siempre clasifica en que no tienen enfermedad los sujetos. Vamos a representarlos en una gráfica donde seguramente veremos que con este modelo no se pueden separar bien los datos.
+
+```{python}
+def grafica_frontera_decision(modelo,predictoras,test,titulo):
+  h=.02
+  x_min,x_max = predictoras[:,0].min() - .5, predictoras[:,0].max() + .5
+  y_min,y_max = predictoras[:,1].min() - .5, predictoras[:,1].max() + .5
+  xx,yy = np.meshgrid(np.arange(x_min,x_max,h),np.arange(y_min,y_max,h))
+  Z=modelo.predict(np.c_[xx.ravel(),yy.ravel()])
+  Z=Z.reshape(xx.shape)
+  plt.figure(figsize=(8,6))
+  for i in range(len(Z)):
+    for j in range(len(Z[i])):
+      if Z[i][j] == "No enfermedad":
+        Z[i][j] = 0
+      elif Z[i][j] == "Sleep apnea":
+        Z[i][j] = 1
+      else:
+        Z[i][j] = 2
+  Z = Z.astype(int)
+  plt.contourf(xx,yy,Z,cmap=plt.cm.Pastel1,alpha=0.8)
+  sns.scatterplot(x=predictoras[:, 0], y=predictoras[:, 1], hue=test, palette="Set2", s=70, edgecolor="k")
+  plt.xlabel("Componente Principal 1")
+  plt.ylabel("Componente Principal 2")
+  plt.title(titulo)
+  plt.legend(title="Clase")
+  plt.grid(True)
+  plt.tight_layout()
+  plt.show()
+
+grafica_frontera_decision(clasif_NB,Conjunto_test,objetivo_test,"Frontera decision NB")
+```
+Ya tenemos construida la función, ahora dibujamos la gráfica:
+
+```{python}
+grafica_frontera_decision(clasif_NB,Conjunto_test,objetivo_test,"Frontera decision NB")
+```
+
+
+
+
+### Random forest
+Aplicamos una malla para hallar los mejores hiperparámetros:
+
+```{python}
+rejilla_parametros =[{'n_estimators':[3,5,7,9], 'max_features':[2,4,6,8]},{'bootstrap': [True],'n_estimators':[5],'max_features':[5]},]
+forest = RandomForestClassifier(random_state=47563)
+grid_search = GridSearchCV(forest,rejilla_parametros,cv=15,scoring='accuracy',return_train_score=True)
+grid_search.fit(Conjunto_entrenamiento,objetivo_train)
+```
+
+Vemos ahora cuales son los mejores valores de hiperparámetros y por tanto cuál es el mejor modelo de Random Forest:
+
+```{python}
+grid_search.best_estimator_
+mejor_mod_RF = grid_search.best_estimator_
+print(mejor_mod_RF)
+```
+
+Y una vez nos quedamos con el mejor modelo pasamos a calcular las predicciones sobre el conjunto test y ver las métricas como en el caso de Naive Bayes:
+
+```{python}
+objetivo_predicho_RF = mejor_mod.predict(Conjunto_test)
+print(classification_report(objetivo_test,objetivo_predicho_RF,target_names=np.unique(objetivo_test)))
+```
+
+El modelo es ligeramente mejor, pasamos a ver la matriz de confusión también:
+
+
+```{python}
+ConfusionMatrixDisplay.from_estimator(mejor_mod,Conjunto_test,objetivo_test,display_labels=np.unique(objetivo_test),cmap="Blues")
+plt.title("Matriz de Confusión: Método RF")
+plt.show()
+```
+
+El modelo clasifica peor, puesto que hay muchas personas que no presentan enferemedad y que las trata como si tuvieran insomnio. Por otro lado en este modelo podemos detectar mejor q antes a las personas que tienen insomnio
+
+
+### Decision Tree
+
+Vamos a pasarle al modelo otra vez una serie de hiperparámetros que sera la profundidad máxima del árbol para ver otra vez cual es la mejor profundidad de todas ellas y quedarnos con el mejor modelo:
+
+```{python}
+rejilla_parametros =[{'max_depth':[3,5,7,9,11]},]
+
+arbol_decision = DecisionTreeClassifier(random_state=47563)
+grid_search=GridSearchCV(arbol_decision,rejilla_parametros,cv=15,scoring='accuracy',return_train_score=True)
+
+grid_search.fit(Conjunto_entrenamiento,objetivo_train)
+
+grid_search.best_estimator_
+mejor_mod_DT = grid_search.best_estimator_
+```
+
+El mejor modelo es el que presenta una menor profundidad. Hacemos las predicciones y evaluamos el rendimiento del modelo:
+
+```{python}
+objetivo_predicho_DT = mejor_mod_DT.predict(Conjunto_test)
+print(classification_report(objetivo_test,objetivo_predicho_DT,target_names=np.unique(objetivo_test)))
+```
+Tenemos un modelo de un rendimiento muy similar al anterior a simple vista. Volvemos a visualizar la matriz de confusión:
+
+```{python}
+ConfusionMatrixDisplay.from_estimator(mejor_mod_DT,Conjunto_test,objetivo_test,display_labels=np.unique(objetivo_test),cmap="Blues")
+plt.title("Matriz de Confusión: Método DT")
+plt.show()
+```
+Este modelo es muy similar al primero 
+
+### KNN
+
+```{python}
+rejilla_parametros =[{'n_neighbors':[3,5,7,9,11]},]
+
+knn = neighbors.KNeighborsClassifier(metric='hamming')
+grid_search=GridSearchCV(knn,rejilla_parametros,cv=15,scoring='accuracy',return_train_score=True)
+
+grid_search.fit(Conjunto_entrenamiento,objetivo_train)
+
+grid_search.best_estimator_
+mejor_mod_knn = grid_search.best_estimator_
+```
+
+En este caso nos quedamos con el modelo con 9 vecinos. Pasamos a ver otra vez algunas métricas de este modelo y visualizar la matriz de confusión.
+
+```{python}
+objetivo_predicho_knn = mejor_mod_knn.predict(Conjunto_test)
+print(classification_report(objetivo_test,objetivo_predicho_knn,target_names=np.unique(objetivo_test)))
+```
+
+```{python}
+ConfusionMatrixDisplay.from_estimator(mejor_mod_knn,Conjunto_test,objetivo_test,display_labels=np.unique(objetivo_test),cmap="Blues")
+plt.title("Matriz de Confusión: Método KNN")
+plt.show()
+```
+En este modelo ocurre todo lo contrario, predecimos todos los pacientes como que tienen insomnio, lo cual es incorrecto. Este modelo no lo elegiremos como el mejor.
+
+
+### Red Neuronal
+
+```{python}
+
+rejilla_parametros =[{'hidden_layer_sizes':[(5,5),(5,10),(5,15),(10,5),(10,10),(10,15),(15,5),(15,10),(15,15)],'activation':['relu'],'solver':['adam'],'max_iter':[500,1000]},]
+
+mlp = MLPClassifier(random_state=47563)
+grid_search=GridSearchCV(mlp,rejilla_parametros,cv=15,scoring='accuracy',return_train_score=True)
+
+grid_search.fit(Conjunto_entrenamiento,objetivo_train)
+
+grid_search.best_estimator_
+mejor_mod_mlp = grid_search.best_estimator_
+```
+
+Nos quedamos con el parámetro con menos nodos en cada capa oculta y menor número de iteraciones. Pasamos a ver las métricas del modelo:
+
+```{python}
+objetivo_predicho_mlp = mejor_mod_mlp.predict(Conjunto_test)
+print(classification_report(objetivo_test,objetivo_predicho_mlp,target_names=np.unique(objetivo_test)))
+```
+Tenemos un modelo similar al anterior, veamos en la matriz de confusión si presenta el mismo problema que el anterior:
+
+```{python}
+ConfusionMatrixDisplay.from_estimator(mejor_mod_mlp,Conjunto_test,objetivo_test,display_labels=np.unique(objetivo_test),cmap="Blues")
+plt.title("Matriz de Confusión: Método MLP")
+plt.show()
+```
+Es un modelo calcado al primero, que presenta el mismo problema.
+
+
+### Selección del mejor modelo
+
+
+# Diagnóstico de futuros pacientes
+
+Introduzca los datos del paciente: {.sidebar data-width=230}
+--------------------------------------------------
+
+```{r inputs}
+selectInput("Sexo", label = "Sexo pqciente:",
+            choices = c("Male", "Female"), selected = "Male")
+```
+
+```{r inputs}
+selectInput(
+  "Edad", 
+  label = "Edad del paciente:",
+  choices =  unique(10:100), 
+  selected = first(choices)
+)
+```
+
+```{r inputs}
+selectInput("Ocupación", label = "P Type:",
+            choices = c("Manual Labor", "Office Worker","Retired","Student"), selected = "Manual Labor")
+```
+
+```{r inputs}
+selectInput(
+  "Horas de sueño", 
+  label = "Horas de sueño del paciente (en horas):",
+  choices =  unique(seq(3,14,0.1)), 
+  selected = first(choices)
+)
+```
+
+```{r inputs}
+selectInput(
+  "Calidad del sueño", 
+  label = "Calidad sueño del paciente (1-10):",
+  choices =  unique(1:10), 
+  selected = first(choices)
+)
+```
+
+```{r inputs}
+selectInput(
+  "Actividad Fisica", 
+  label = "Actividad física del paciente (minutos al dái):",
+  choices =  unique(10:200), 
+  selected = first(choices)
+)
+```
+
+```{r inputs}
+selectInput(
+  "Nivel de estres", 
+  label = "Nivel de estres del paciente (1-10):",
+  choices =  unique(1:10), 
+  selected = first(choices)
+)
+```
+
+```{r inputs}
+selectInput("Indice de masa corporal", label = "Yield:",
+            choices = c("Normal", "Obese", "Overweight", "Underwight"), selected = "Normal")
+```
+
+```{r inputs}
+selectInput(
+  "pulsaciones", 
+  label = "Pulsaciones del paciente (por minuto):",
+  choices =  unique(30:160), 
+  selected = first(choices)
+)
+```
+
+```{r inputs}
+selectInput(
+  "pasos", 
+  label = "Pasos diarios del paciente:",
+  choices =  unique(1000:16000), 
+  selected = first(choices)
+)
+```
+
+```{r inputs}
+selectInput(
+  "pasos", 
+  label = "Presión baja del paciente:",
+  choices =  unique(50:110), 
+  selected = first(choices)
+)
+```
+
+```{r inputs}
+selectInput(
+  "pasos", 
+  label = "Presión alta del paciente:",
+  choices =  unique(100:160), 
+  selected = first(choices)
+)
+```
+
+
+
+
+
+
+--------------------------------------------------
+
+Enfermedad del suño que presenta el paciente
+
+
