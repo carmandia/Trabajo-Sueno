@@ -34,19 +34,19 @@ knitr::opts_chunk$set(fig.width = NULL, fig.height = NULL)
 
 Comienzo con la lectura de los datos desde el fichero csv:
 
-```{r,echo=TRUE}
+```{r,echo=F}
 datos <- read_csv("sleep_health_lifestyle_dataset.csv")
 ```
 
 A continuación pasaremos a una visualización del DataFrame para hacernos un poco la idea  las distintas variables que tiene, que trabajo tendremos que acometer a lo largo del proyecto en cuestión de depuración de datos si hiciera falta, que representaciones gráficas pudieran resultar de interés.
 
-```{r,echo=TRUE}
+```{r,echo=F}
 head(datos)
 ```
 
 Como podemos ver de un primer vistazo, nos encontramos con la primera columna que es un id, y por lo tanto podemos prescindir de el tanto para la visualización como para lo modelos. Posteriormente nos encontramos variables como genero y edad cuyo estudio puede ser interesante si mujeres u hombres sufren mas o menos enfermedades del sueño, o si estas se ven afectadas por la franja de edad donde se encuentre la persona. Luego una variable sobre el trabajo que desarrolla la persona que también resulta interesante para los mismos estudios que antes. Tras esto tenemos variables mas relacionadas con el sueño como el numero de horas que duerme la persona o la calidad del sueño que seguro serán muy importantes para la fase de los modelos. Continuando, nos encontramos con una variable, la presión sanguínea que vemos que en una misma variable agrupa dos informaciones, la presión baja y alta separadas por una barra, por lo que como depuración tendremos que separar esta variable en otras dos.
 
-```{r,echo=TRUE}
+```{r,echo=F}
 summary(datos)
 ```
 
@@ -69,7 +69,9 @@ datos %<>%
 
 **Variable Gender**
 
-```{r,echo=TRUE}
+Vemos los niveles de la variable género:
+
+```{r,echo=F}
 datos$Gender <- datos %$%
   Gender %>%
   map(.,as.factor) %>%
@@ -78,6 +80,8 @@ summary(datos$Gender)
 ```
 
  **Variable BMI Category**
+
+Vemos los niveles de la variable índice de masa corporal:
 
 ```{r,echo=TRUE}
 datos$`BMI Category` <- datos %$%
@@ -88,6 +92,8 @@ summary(datos$`BMI Category`)
 
 **Variable Occupation**
 
+Vemos los niveles de la variable ocupación laboral:
+
 ```{r,echo=TRUE}
 datos$Occupation <- datos %$%
   Occupation %>%
@@ -96,6 +102,8 @@ summary(datos$Occupation)
 ```
 
 **Variable Sleep Disorder**
+
+Vemos los niveles de la variable objetivo desorden del sueño:
 
 ```{r,echo=TRUE}
 datos$`Sleep Disorder` <- datos %$%
@@ -131,15 +139,15 @@ datos$Press_High <- Press_High
 datos$Press_Low <- Press_Low
 ```
 
-Ahora solo nos queda eliminar la columna que hemos transformado.
+Ahora solo nos queda eliminar la columna que hemos transformado, y ver el resultado:
 
-```{r,echo=TRUE}
+```{r,echo=F}
 datos %<>%
   select(-`Blood Pressure (systolic/diastolic)`)
 summary(datos)
 ```
 
-De esta manera Ya tenemos todas las variables de manera adecuada para la representación gráfica de estudios que nos interesen para una posterior construcción de modelos.
+De esta manera ya tenemos todas las variables de manera adecuada para la representación gráfica de estudios que nos interesen para una posterior construcción de modelos.
 
 ### Exportación de los datos
 
@@ -158,31 +166,31 @@ write_csv(x = datos2,file = "Datos_depurados.csv",col_names = T)
 
 <h2>Influencia de la presión arterial</h2>
 <div>
-```{r,echo=TRUE}
+```{r,echo=F}
 datos %>%
   ggplot(aes(Press_High,Press_Low,color=`Sleep Disorder`)) +
   geom_point()
 ```
 </div>
+
 En esta primera gráfica comparamos la presión alta y la presión baja en función del tipo de enfermedad del sueño que tenga la persona. Una vez hecha la representación no podemos inferir gran cosa a partir del gráfico, puesto que todas las enfermedades están mas o menos igualmente representadas para valores similares de presión arterial
 
 <div>
-```{r,echo=TRUE}
+```{r,echo=F}
 datos %>%
   ggplot(aes(Press_High,Press_Low,color=`Sleep Disorder`)) +
   geom_point() +
   geom_smooth(aes(linetype = `Sleep Disorder`))
 ```
 </div>
-Como podemos observar las linea que interpola cada conjunto de puntos en función de la clase de enfermedad del sueño que tenga es muy similar. Y hay que recalcar que los intervalos de confianza se cortan por lo que podemos descartar que estas variables nos sirvan para identificar que tipo de enfermedad posee la persona
+
+Como podemos observar las linea que interpola cada conjunto de puntos en función de la clase de enfermedad del sueño que tenga es muy similar. Y hay que recalcar que los intervalos de confianza se cortan por lo que podemos descartar que estas variables nos sirvan para identificar que tipo de enfermedad posee la persona.
 
 # Pulsaciones por minuto {data-navmenu="Estudio de influencia en la variable objetivo"}
 
 <h2>Influencia de las pulsaciones </h2>
 
-<div class="row">
-  <div class="col-6">
-  <p>
+<div>
 ```{r,echo=F}
 datos %>%
   ggplot() +
@@ -191,12 +199,10 @@ datos %>%
                fun.min = min,
                fun.max = max)
 ```
-  </p>
-  </div>
-  <div class="col-6">
-<p>Al igual que en el caso anterior parece que vuelven a ser muy similares las pulsaciones independientemente de la enfermedad que presente el individuo. Lo único que podríamos destacar es que los individuos con apnea del sueño la tienen algo mas alta</p>
-  </div>
 </div>
+
+Al igual que en el caso anterior parece que vuelven a ser muy similares las pulsaciones independientemente de la enfermedad que presente el individuo. Lo único que podríamos destacar es que los individuos con apnea del sueño la tienen algo mas alta.
+  
 
 
 # Índice de masa corporal {data-navmenu="Estudio de influencia en la variable objetivo"}
@@ -211,7 +217,8 @@ datos %>%
   geom_bar(aes(x=`Sleep Disorder`,fill=`BMI Category`))
 ```
 </div>
-En esta gráfica si que parece que podemos sacar alguna que otra conclusión mas: en el caso de las personas que sufren insomnio, hay una mayor proporción de personas que están demasiado delgados; en el caso de las personas que no sufren ninguna enfermedad parece que hay mayor proporción e personas que sufren sobrepeso. Por otro lado de las personas que sufren apnea del sueño parece que tienen igual proporción.
+
+En esta gráfica si que parece que podemos sacar alguna que otra conclusión mas: en el caso de las personas que sufren insomnio, hay una mayor proporción de personas que están demasiado delgados; en el caso de las personas que no sufren ninguna enfermedad (que son la mayoría de ellas), parece que hay mayor proporción en personas que sufren sobrepeso. Por otro lado de las personas que sufren apnea del sueño parece que tienen igual proporción.
 
 
 
@@ -222,13 +229,14 @@ datos %>%
   geom_bar(aes(x=`Sleep Disorder`,fill=`BMI Category`),position = "dodge")
 ```
 </div>
+
 Con esta gráfica podemos ver mas claro el diagrama anterior. Se hace notar mas que las personas con un indice de masa normal están representadas en menor proporción en el conjunto de personas sin enfermedad del sueño
 
-# Ocupación laboral e indice de masa corporal {data-navmenu="Estudio de influencia en la variable objetivo"}
+# Ocupación laboral y nivel de estrés {data-navmenu="Estudio de influencia en la variable objetivo"}
 <h2>Influencia conjunta de ambas variables </h2>
 
 <div>
-```{r,echo=TRUE}
+```{r,echo=F}
 datos %>%
   count(Occupation,`Stress Level (scale: 1-10)`,`Sleep Disorder`) %>%
   group_by(Occupation,`Sleep Disorder`) %>%
@@ -241,28 +249,31 @@ datos %>%
 
 </div>
 
-En este gráfico comparamos por la ocupación que tienen las personas y su enfermedad (o ausencia de ella) el nivel de estrés que dicen tener por si esto pudiera tener un comportamiento específico. Por ejemplo, para las personas que trabajan en labores manuales, los que sufren apnea del sueño son los que en mayor proporción tienen altos niveles de estrés. Lo mismo ocurre para el caso de los estudiantes, que en gran proporción los que dicen sufrir niveles altos de estrés sufren apnea del sueño. En cambio, las personas que sufren insomnio, en cualquier ocupación laboral, parece que se encuentran en mayor porcentaje en niveles de estrés bajos, mientras que las personas que no sufren ninguna enfermedad del sueño parecen estar repartidos los porcentajes entre los distintos niveles de estrés para cualquier ocupación
+En este gráfico comparamos por la ocupación que tienen las personas y su enfermedad, o ausencia de ella, el nivel de estrés que dicen tener por si esto pudiera tener un comportamiento específico. Por ejemplo, para las personas que trabajan en labores manuales, los que sufren apnea del sueño son los que en mayor proporción tienen altos niveles de estrés. Lo mismo ocurre para el caso de los estudiantes, que en gran proporción los que dicen sufrir niveles altos de estrés sufren apnea del sueño. En cambio, las personas que sufren insomnio, en cualquier ocupación laboral, parece que se encuentran en mayor porcentaje en niveles de estrés bajos, mientras que las personas que no sufren ninguna enfermedad del sueño parecen estar repartidos los porcentajes entre los distintos niveles de estrés para cualquier ocupación.
 
 # Actividad física y duración del sueño {data-navmenu="Estudio de influencia en la variable objetivo"}
+
 <h2>Influencia conjunta de ambas variables </h2>
 
 <div>
-```{r,echo=TRUE}
+```{r,echo=F}
 datos %>%
   ggplot(aes(`Sleep Duration (hours)`,`Quality of Sleep (scale: 1-10)`,color=`Sleep Disorder`)) +
   geom_point()
 ```
 </div>
+
 Volvemos a encontrarnos una situación en la que no podemos sacar demasiadas conclusiones puesto que no se observa un patrón en los datos. Lo mas reseñable es que la mayoría de puntos de personas con apnea del sueño tienen una calidad del sueño intermedio, ni valores muy altos ni muy bajos. Vamos a realizar una curva de regresión con su intervalo de confianza para asegurarnos de este patrón
 
 <div>
-```{r,echo=TRUE}
+```{r,echo=F}
 datos %>%
   ggplot(aes(`Sleep Duration (hours)`,`Quality of Sleep (scale: 1-10)`,color=`Sleep Disorder`)) +
   geom_point() +
   geom_smooth(aes(linetype = `Sleep Disorder`))
 ```
 </div>
+
 Vemos que parece que estábamos en lo cierto que no podemos sacar conclusiones puesto que los tres intervalos de confianza se cortan y por tanto no podemos inferir que con una calidad del sueño mejor o pero o mas o menos horas de sueño pueda referirse a una persona con una determinada enfermedad del sueño.
 
 # División y preparación del conjunto de datos {data-navmenu="Modelado de datos" }
@@ -293,18 +304,12 @@ from sklearn.neural_network import MLPClassifier
 from sklearn.utils import resample
 ```
 
-```{r}
-#reticulate::py_last_error()
-```
-
 Leemos y vemos una breve descripción de los datos para ver que no ha habido ningún problema:
 
 ```{python}
 datos2 = pd.read_csv('Datos_depurados.csv')
 datos2.info()
 ```
-
-Particionamos los datos en entrenamiento y test para la construcción de los modelos.
 
 En las anteriores secciones nos hemos dado cuenta que hay muchos mas pacientes sin enfermedad que con apnea o insomnio. Veamos en términos porcentuales:
 
@@ -323,6 +328,7 @@ print(no_enfermedad.shape)
 print(insomnio.shape)
 print(sleep_apnea.shape)
 ```
+Vemos cuantos datos hay, para cada uno de los niveles de la variable (no enfermedad, insomnio y apnea del sueño). Realizamos upsampling y vemos cuantos datos obtenemos al final:
 
 ```{python}
 insomnio_upsample = resample(insomnio,replace=True,n_samples=len(no_enfermedad),random_state=47563)
@@ -347,7 +353,7 @@ predictoras = datos_upsampled.loc[:,datos_upsampled.columns != 'Sleep Disorder']
 objetivo = datos_upsampled['Sleep Disorder']
 ```
 
-Particionamos los datos en predictoras y objetivo teniendo en cuenta que tenemos que mantener esta proporción.
+Particionamos los datos en entrenamiento y test para la construcción de los modelos, teniendo en cuenta que tenemos que mantener esta proporción. Dejamos únicamente un 25% de los datos destinado al conjunto test.
 
 ```{python}
 (predictoras_train,predictoras_test,objetivo_train,objetivo_test) = model_selection.train_test_split(predictoras,objetivo,random_state=47563, test_size=.25,stratify=objetivo)
@@ -363,7 +369,7 @@ predictoras_train_cat = predictoras_train.select_dtypes(include='object')
 predictoras_train_cat.info()
 predictoras_train_num.info()
 ```
-Ahora construimos nuestro *pipeline* para transformar los datos. Como en el apartado de visualización no hemos visto que haya ninguna variable que podamos decir que separa a nuestra variable objetivo hacemos un análisis en componentes prinicpales, para ver si reduciendo la dimensionalidad de los datos lo obtenemos de una mejor manera:
+Ahora construimos nuestro *pipeline* para transformar los datos. Como en el apartado de visualización no hemos visto que haya ninguna variable que podamos decir que separa a nuestra variable objetivo hacemos un análisis en componentes principales, para ver si reduciendo la dimensionalidad de los datos lo obtenemos de una mejor manera:
 
 ```{python}
 preprocesador = ColumnTransformer([('num', StandardScaler(), predictoras_train_num.columns.to_list()),('cat', OneHotEncoder(), predictoras_train_cat.columns.to_list()),])
@@ -377,7 +383,7 @@ Conjunto_test = pipeline.transform(predictoras_test)
 #print(Conjunto_test)
 ```
 
-Ya tenemos los conjuntos de entrenamiento y test listos para crear los modelos y ver el rendimiento de los mismos
+Ya tenemos los conjuntos de entrenamiento y test listos para crear los modelos y ver el rendimiento de los mismos.
 
 # Modelo Naive-Bayes {data-navmenu="Modelado de datos"}
 
@@ -446,7 +452,7 @@ grafica_frontera_decision(clasif_NB,Conjunto_test,objetivo_test,"Frontera decisi
 ## Columna {data-width=1}
 
 ### Conclusiones
-Podemos ver que el rendimiento de nuestro modelo es en general malo, pues no detecta de manera correcta la apnea del sueño y el insomnio. Viendo representada la matriz de confusión, como sospechábamos siempre clasifica en que no tienen enfermedad los sujetos. Vamos a representarlos en una gráfica donde seguramente veremos que con este modelo no se pueden separar bien los datos.
+Podemos ver que el rendimiento de nuestro modelo es en general malo, pues no detecta de manera correcta ninguno de los niveles. Viendo representada la matriz de confusión, como sospechábamos no suele clasificar bien a los sujetos, tiene poca precisión. Representando la frontera de decisión vemos que con este modelo no conseguimos separar bien los datos.
 
 # Modelo Random forest {data-navmenu="Modelado de datos"}
 
@@ -503,7 +509,7 @@ grafica_frontera_decision(mejor_mod_RF,Conjunto_test,objetivo_test,"Frontera dec
 ## Columna {data-width=1}
 
 ### Conclusiones
-El modelo es ligeramente mejor, puesto que si clasificamos de manera correcta algunos casos de pacientes con insomnio. Pasamos a ver la matriz de confusión también, y nos percatamos que el modelo clasifica peor la clase de no enfermedad, puesto que hay muchas personas que no presentan enfermedad y que las trata como si tuvieran insomnio. 
+El modelo es bastante mejor que el anterior, ya que tenemos una accuracy casi de 0.9, y la métrica recall en insomnio y apnea del sueño es muy próxima a 1. Pasamos a ver la matriz de confusión también, y nos percatamos que el modelo clasifica perfectamente a las persponas con apnea del sueño y cas perfecto a los sujetos con insomnio. Viendo la frontera de decisión es mucho mejor que en el apartado anterior.
 
 # Modelo Decision Tree {data-navmenu="Modelado de datos"}
 
@@ -557,7 +563,7 @@ grafica_frontera_decision(mejor_mod_DT,Conjunto_test,objetivo_test,"Frontera dec
 ## Columna {data-width=1}
 
 ### Conclusiones
-Tenemos un modelo de un rendimiento muy similar al primero a simple vista de las métricas. Volvemos a visualizar la matriz de confusión.
+Tenemos un modelo de un rendimiento muy similar al primero a simple vista de las métricas. Volvemos a visualizar la matriz de confusión, y vemos que no clasifica para nada bien a las personas que no tienen enfermedad.
 
 # Modelo KNN {data-navmenu="Modelado de datos"}
 
@@ -609,7 +615,7 @@ grafica_frontera_decision(mejor_mod_knn,Conjunto_test,objetivo_test,"Frontera de
 ## Columna {data-width=1}
 
 ### Conclusiones
-En este modelo ocurre todo lo contrario, predecimos todos los pacientes como que tienen insomnio, lo cual es incorrecto. Este modelo no lo elegiremos como el mejor.
+En este modelo ocurre todo lo contrario, predecimos todos los pacientes como que tienen insomnio, lo cual es incorrecto. Este modelo no lo elegiremos como el mejor, lo descartamos inmediatamente.
 
 # Modelo MLP {data-navmenu="Modelado de datos"}
 
@@ -626,7 +632,7 @@ grid_search.fit(Conjunto_entrenamiento,objetivo_train)
 mejor_mod_mlp = grid_search.best_estimator_
 ```
 
-Vemos ahora cuales son los mejores valores de hiperparámetros y por tanto cuál es el mejor modelo de KNN:
+Vemos ahora cuales son los mejores valores de hiperparámetros y por tanto cuál es el mejor modelo de mlp:
 
 ```{python}
 print(mejor_mod_mlp)
@@ -660,8 +666,7 @@ grafica_frontera_decision(mejor_mod_mlp,Conjunto_test,objetivo_test,"Frontera de
 ## Columna {data-width=1}
 
 ### Conclusiones
-Tenemos un modelo similar al primero de nuevo, veamos en la matriz de confusión y nos daremos cuenta de que es similar a los modelos Naive Bayes y Decision Tree.
-Es un modelo calcado al primero, que presenta el mismo problema.
+Tenemos un modelo similar al primero de nuevo, aunque algo mejorado. Vemos en la matriz de confusión y nos damos cuenta de que clasificamos con muy poca precisión la clase no enfermedad, a pesar de que es algo mejor para insomnio y apnea del sueño. La frontera de separación es algo menos basta que la del modelo NB, pero sigue siendo poco aclaratoria. Es un modelo calcado al primero, que presenta el mismo problema.
 
 # Elección mejor modelo {data-navmenu="Modelado de datos"}
 Hemos visto las métricas de cada uno de los modelos, comparando su *accuracy*, *precission*, ó parámetros como *f1 score*. También hemos observado para cada uno de los modelos la matriz de confusión, y un gráfico en el que vemos como separan las clases las 2 componentes principales. Tras lo comentado en cada uno de los modelos selecciono el modelo **Random Forest**.
@@ -803,7 +808,7 @@ output$diagnostico <- renderPrint({
   datos_py <- reticulate::r_to_py(datos)
   datos_transformados <- py$pipeline$transform(datos_py)
   prediccion <- py$mejor_mod_RF$predict(datos_transformados)
-  prediccion
+  cat(prediccion)
 })
 
 verbatimTextOutput("diagnostico")
@@ -812,16 +817,16 @@ verbatimTextOutput("diagnostico")
 Con una probabilidad de:
 
 ```{r}
-output$prob <- renderTable({
+output$prob <- renderPrint({
   datos <- datos_paciente()
   datos_py <- reticulate::r_to_py(datos)
   datos_transformados <- py$pipeline$transform(datos_py)
   probabilidad_pred <- py$mejor_mod_RF$predict_proba(datos_transformados)
-  max(probabilidad_pred)
+  cat(round(max(probabilidad_pred),3))
   #propabilidad_r <- py_to_r(probabilidad_pred)
   #probabilidad_r
 })
 
-tableOutput("prob")
+verbatimTextOutput("prob")
 ```
 
